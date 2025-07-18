@@ -34,6 +34,27 @@ def derive_key(password: str) -> bytes:
     return hashlib.sha256(password.encode()).digest()
 
 
+def list_devices(_: argparse.Namespace) -> None:
+    """Print available audio input and output devices."""
+    if pyaudio is None:
+        print("pyaudio is required for device listing", file=sys.stderr)
+        sys.exit(1)
+
+    pa = pyaudio.PyAudio()
+    try:
+        for i in range(pa.get_device_count()):
+            info = pa.get_device_info_by_index(i)
+            flags = []
+            if info.get("maxInputChannels", 0) > 0:
+                flags.append("input")
+            if info.get("maxOutputChannels", 0) > 0:
+                flags.append("output")
+            roles = "/".join(flags) if flags else ""
+            print(f"{i}: {info.get('name', 'Unknown')} ({roles})")
+    finally:
+        pa.terminate()
+
+
 class VoiceSocket:
     """Wrapper around a UDP socket with optional AES encryption."""
 
@@ -68,12 +89,17 @@ class VoiceSocket:
 
 
 class VoiceServer:
-    def __init__(self, host: str, port: int, key: bytes | None):
+    def __init__(self, host: str, port: int, key: bytes | None,
+                 output_device: int | None = None):
         if pyaudio is None:
             raise RuntimeError("pyaudio is required for audio playback")
         self.audio = pyaudio.PyAudio()
-        self.stream = self.audio.open(format=pyaudio.paInt16, channels=DEFAULT_CHANNELS,
-                                      rate=DEFAULT_RATE, output=True, frames_per_buffer=CHUNK)
+        params = dict(format=pyaudio.paInt16, channels=DEFAULT_CHANNELS,
+                      rate=DEFAULT_RATE, output=True,
+                      frames_per_buffer=CHUNK)
+        if output_device is not None:
+            params["output_device_index"] = output_device
+        self.stream = self.audio.open(**params)
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.bind((host, port))
         self.vsock = VoiceSocket(sock, key is not None, key)
@@ -94,13 +120,18 @@ class VoiceServer:
 
 
 class VoiceClient:
-    def __init__(self, host: str, port: int, key: bytes | None):
+    def __init__(self, host: str, port: int, key: bytes | None,
+                 input_device: int | None = None):
         if pyaudio is None:
             raise RuntimeError("pyaudio is required for audio capture")
         self.target = (host, port)
         self.audio = pyaudio.PyAudio()
-        self.stream = self.audio.open(format=pyaudio.paInt16, channels=DEFAULT_CHANNELS,
-                                      rate=DEFAULT_RATE, input=True, frames_per_buffer=CHUNK)
+        params = dict(format=pyaudio.paInt16, channels=DEFAULT_CHANNELS,
+                      rate=DEFAULT_RATE, input=True,
+                      frames_per_buffer=CHUNK)
+        if input_device is not None:
+            params["input_device_index"] = input_device
+        self.stream = self.audio.open(**params)
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.vsock = VoiceSocket(sock, key is not None, key)
 
@@ -168,13 +199,13 @@ class TextClient:
 
 def run_server(args):
     key = derive_key(args.password) if args.password else None
-    server = VoiceServer(args.host, args.port, key)
+    server = VoiceServer(args.host, args.port, key, args.output_device)
     server.serve()
 
 
 def run_client(args):
     key = derive_key(args.password) if args.password else None
-    client = VoiceClient(args.host, args.port, key)
+    client = VoiceClient(args.host, args.port, key, args.input_device)
     client.start()
 
 
@@ -198,12 +229,16 @@ def main():
     srv.add_argument("--host", default="0.0.0.0", help="Host to bind")
     srv.add_argument("--port", type=int, default=7777, help="UDP port")
     srv.add_argument("--password", help="Shared password for encryption")
+    srv.add_argument("--output-device", type=int,
+                     help="PyAudio output device index")
     srv.set_defaults(func=run_server)
 
     cli = sub.add_parser("client", help="Run in client mode")
     cli.add_argument("--host", required=True, help="Server address")
     cli.add_argument("--port", type=int, default=7777, help="UDP port")
     cli.add_argument("--password", help="Shared password for encryption")
+    cli.add_argument("--input-device", type=int,
+                     help="PyAudio input device index")
     cli.set_defaults(func=run_client)
 
     tsrv = sub.add_parser("text-server", help="Run text chat server")
@@ -217,6 +252,9 @@ def main():
     tcli.add_argument("--port", type=int, default=8888, help="UDP port for text chat")
     tcli.add_argument("--password", help="Shared password for encryption")
     tcli.set_defaults(func=run_text_client)
+
+    ldev = sub.add_parser("list-devices", help="List audio devices")
+    ldev.set_defaults(func=list_devices)
 
     args = parser.parse_args()
 

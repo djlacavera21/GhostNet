@@ -7,8 +7,9 @@ Legacy bash implementation with menu driven interface using `ffmpeg` and `netcat
 
 ## `ghostnet.py`
 Cross-platform Python rewrite featuring optional AES encryption and direct
-command line arguments. As of the latest version, the script also supports
-basic UDP text chat.
+command line arguments. The tool supports basic UDP text chat and now allows
+selecting audio input/output devices by index. A `list-devices` command is
+provided to display available devices.
 
 ### Usage
 
@@ -16,14 +17,23 @@ basic UDP text chat.
 # Run voice server
 python3 ghostnet.py server --port 7777 --password mysecret
 
+# Use a specific output device (index 2)
+python3 ghostnet.py server --port 7777 --output-device 2
+
 # Run voice client
 python3 ghostnet.py client --host 192.168.1.100 --port 7777 --password mysecret
+
+# Use a specific input device (index 1)
+python3 ghostnet.py client --host 192.168.1.100 --port 7777 --input-device 1
 
 # Run text chat server
 python3 ghostnet.py text-server --port 8888 --password mysecret
 
 # Run text chat client
 python3 ghostnet.py text-client --host 192.168.1.100 --port 8888 --password mysecret
+
+# List available audio devices
+python3 ghostnet.py list-devices
 ```
 
 The text server now broadcasts messages to all connected clients, enabling
