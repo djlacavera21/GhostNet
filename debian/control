@@ -1,0 +1,14 @@
+Source: ghostnet
+Section: misc
+Priority: optional
+Maintainer: Example Maintainer <maintainer@example.com>
+Build-Depends: debhelper (>= 13)
+Standards-Version: 4.6.2
+Homepage: https://example.com
+
+Package: ghostnet
+Architecture: all
+Depends: ${misc:Depends}, python3, ffmpeg, netcat-openbsd, alsa-utils, sox, bc, curl, jq, miniupnpc, python3-pyaudio, python3-pycryptodome
+Description: Lightweight P2P voice and text communications tool
+ A cross-platform program for voice and text communication over UDP.
+ Includes both bash and Python implementations.
