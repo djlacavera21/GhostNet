@@ -26,8 +26,16 @@ python3 ghostnet.py text-server --port 8888 --password mysecret
 python3 ghostnet.py text-client --host 192.168.1.100 --port 8888 --password mysecret
 ```
 
+The text server now broadcasts messages to all connected clients, enabling
+basic group chat.
+
 Both server and client require `pyaudio` and, for encryption, the
-`pycryptodome` package.
+`pycryptodome` package. These dependencies are listed in `requirements.txt` and
+can be installed with:
+
+```bash
+pip install -r requirements.txt
+```
 
 ### Building a Debian package
 

@@ -119,21 +119,27 @@ class VoiceClient:
 
 
 class TextServer:
-    """Simple UDP text chat server."""
+    """Simple UDP text chat server with basic message broadcasting."""
 
     def __init__(self, host: str, port: int, key: bytes | None):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.bind((host, port))
         self.vsock = VoiceSocket(sock, key is not None, key)
+        self.clients: set[tuple[str, int]] = set()
 
     def serve(self):
         print("[TextServer] Listening for messages...")
         try:
             while True:
                 data, addr = self.vsock.recv(4096)
-                if data:
-                    msg = data.decode(errors="replace")
-                    print(f"{addr[0]}:{addr[1]} > {msg}")
+                if not data:
+                    continue
+                self.clients.add(addr)
+                msg = data.decode(errors="replace")
+                print(f"{addr[0]}:{addr[1]} > {msg}")
+                for client in self.clients:
+                    if client != addr:
+                        self.vsock.send(data, client)
         except KeyboardInterrupt:
             pass
 
