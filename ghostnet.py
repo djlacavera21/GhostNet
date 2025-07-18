@@ -3,6 +3,7 @@
 
 A cross-platform voice and text communication tool using UDP sockets.
 Supports optional AES-256-GCM encryption with a shared passphrase.
+Now includes basic text chat functionality.
 """
 
 import argparse
@@ -117,6 +118,48 @@ class VoiceClient:
             self.audio.terminate()
 
 
+class TextServer:
+    """Simple UDP text chat server."""
+
+    def __init__(self, host: str, port: int, key: bytes | None):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.bind((host, port))
+        self.vsock = VoiceSocket(sock, key is not None, key)
+
+    def serve(self):
+        print("[TextServer] Listening for messages...")
+        try:
+            while True:
+                data, addr = self.vsock.recv(4096)
+                if data:
+                    msg = data.decode(errors="replace")
+                    print(f"{addr[0]}:{addr[1]} > {msg}")
+        except KeyboardInterrupt:
+            pass
+
+
+class TextClient:
+    """Simple UDP text chat client."""
+
+    def __init__(self, host: str, port: int, key: bytes | None):
+        self.target = (host, port)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.vsock = VoiceSocket(sock, key is not None, key)
+
+    def start(self):
+        print(
+            f"[TextClient] Sending text to {self.target[0]}:{self.target[1]} (Ctrl+C to quit)"
+        )
+        try:
+            while True:
+                msg = input("> ")
+                if not msg:
+                    continue
+                self.vsock.send(msg.encode(), self.target)
+        except KeyboardInterrupt:
+            pass
+
+
 def run_server(args):
     key = derive_key(args.password) if args.password else None
     server = VoiceServer(args.host, args.port, key)
@@ -126,6 +169,18 @@ def run_server(args):
 def run_client(args):
     key = derive_key(args.password) if args.password else None
     client = VoiceClient(args.host, args.port, key)
+    client.start()
+
+
+def run_text_server(args):
+    key = derive_key(args.password) if args.password else None
+    server = TextServer(args.host, args.port, key)
+    server.serve()
+
+
+def run_text_client(args):
+    key = derive_key(args.password) if args.password else None
+    client = TextClient(args.host, args.port, key)
     client.start()
 
 
@@ -144,6 +199,18 @@ def main():
     cli.add_argument("--port", type=int, default=7777, help="UDP port")
     cli.add_argument("--password", help="Shared password for encryption")
     cli.set_defaults(func=run_client)
+
+    tsrv = sub.add_parser("text-server", help="Run text chat server")
+    tsrv.add_argument("--host", default="0.0.0.0", help="Host to bind")
+    tsrv.add_argument("--port", type=int, default=8888, help="UDP port for text chat")
+    tsrv.add_argument("--password", help="Shared password for encryption")
+    tsrv.set_defaults(func=run_text_server)
+
+    tcli = sub.add_parser("text-client", help="Run text chat client")
+    tcli.add_argument("--host", required=True, help="Server address")
+    tcli.add_argument("--port", type=int, default=8888, help="UDP port for text chat")
+    tcli.add_argument("--password", help="Shared password for encryption")
+    tcli.set_defaults(func=run_text_client)
 
     args = parser.parse_args()
 
