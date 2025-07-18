@@ -21,3 +21,15 @@ python3 ghostnet.py client --host 192.168.1.100 --port 7777 --password mysecret
 
 Both server and client require `pyaudio` and, for encryption, the
 `pycryptodome` package.
+
+### Building a Debian package
+
+The repository includes a `debian` directory for generating a `.deb` package. To
+build it locally, run:
+
+```bash
+dpkg-buildpackage -us -uc
+```
+
+The resulting package will install the Python script as `ghostnet` and the
+legacy `gn4.sh` helper under `/usr/bin`.
