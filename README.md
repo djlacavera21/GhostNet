@@ -29,15 +29,15 @@ python3 ghostnet.py client --host 192.168.1.100 --port 7777 --input-device 1
 # Run text chat server
 python3 ghostnet.py text-server --port 8888 --password mysecret
 
-# Run text chat client
-python3 ghostnet.py text-client --host 192.168.1.100 --port 8888 --password mysecret
+# Run text chat client with a nickname
+python3 ghostnet.py text-client --host 192.168.1.100 --port 8888 --name alice --password mysecret
 
 # List available audio devices
 python3 ghostnet.py list-devices
 ```
 
-The text server now broadcasts messages to all connected clients, enabling
-basic group chat.
+The text server can now broadcast its own messages and each client runs
+a background listener so group chat works interactively.
 
 Both server and client require `pyaudio` and, for encryption, the
 `pycryptodome` package. These dependencies are listed in `requirements.txt` and

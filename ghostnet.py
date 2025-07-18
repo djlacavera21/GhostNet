@@ -3,7 +3,8 @@
 
 A cross-platform voice and text communication tool using UDP sockets.
 Supports optional AES-256-GCM encryption with a shared passphrase.
-Now includes basic text chat functionality.
+Text chat clients now run concurrent send/receive loops and the server
+can broadcast messages from its console.
 """
 
 import argparse
@@ -159,9 +160,26 @@ class TextServer:
         self.clients: set[tuple[str, int]] = set()
 
     def serve(self):
-        print("[TextServer] Listening for messages...")
+        print("[TextServer] Listening for messages... (Ctrl+C to quit)")
+
+        stop = threading.Event()
+
+        def input_loop() -> None:
+            try:
+                while not stop.is_set():
+                    msg = input()
+                    if not msg:
+                        continue
+                    data = msg.encode()
+                    for client in list(self.clients):
+                        self.vsock.send(data, client)
+            except KeyboardInterrupt:
+                stop.set()
+
+        thread = threading.Thread(target=input_loop, daemon=True)
+        thread.start()
         try:
-            while True:
+            while not stop.is_set():
                 data, addr = self.vsock.recv(4096)
                 if not data:
                     continue
@@ -173,13 +191,17 @@ class TextServer:
                         self.vsock.send(data, client)
         except KeyboardInterrupt:
             pass
+        finally:
+            stop.set()
+            thread.join(timeout=0.2)
 
 
 class TextClient:
     """Simple UDP text chat client."""
 
-    def __init__(self, host: str, port: int, key: bytes | None):
+    def __init__(self, host: str, port: int, key: bytes | None, name: str = "Anonymous"):
         self.target = (host, port)
+        self.name = name
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.vsock = VoiceSocket(sock, key is not None, key)
 
@@ -187,14 +209,33 @@ class TextClient:
         print(
             f"[TextClient] Sending text to {self.target[0]}:{self.target[1]} (Ctrl+C to quit)"
         )
+        stop = threading.Event()
+
+        def recv_loop() -> None:
+            while not stop.is_set():
+                try:
+                    data, _ = self.vsock.recv(4096)
+                except Exception:
+                    continue
+                if data:
+                    msg = data.decode(errors="replace")
+                    print(f"\r{msg}\n> ", end="", flush=True)
+
+        thread = threading.Thread(target=recv_loop, daemon=True)
+        thread.start()
+
         try:
             while True:
                 msg = input("> ")
                 if not msg:
                     continue
-                self.vsock.send(msg.encode(), self.target)
+                full = f"{self.name}: {msg}"
+                self.vsock.send(full.encode(), self.target)
         except KeyboardInterrupt:
             pass
+        finally:
+            stop.set()
+            thread.join(timeout=0.2)
 
 
 def run_server(args):
@@ -217,7 +258,7 @@ def run_text_server(args):
 
 def run_text_client(args):
     key = derive_key(args.password) if args.password else None
-    client = TextClient(args.host, args.port, key)
+    client = TextClient(args.host, args.port, key, args.name)
     client.start()
 
 
@@ -251,6 +292,7 @@ def main():
     tcli.add_argument("--host", required=True, help="Server address")
     tcli.add_argument("--port", type=int, default=8888, help="UDP port for text chat")
     tcli.add_argument("--password", help="Shared password for encryption")
+    tcli.add_argument("--name", default="Anonymous", help="Display name for chat messages")
     tcli.set_defaults(func=run_text_client)
 
     ldev = sub.add_parser("list-devices", help="List audio devices")
