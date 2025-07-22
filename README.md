@@ -47,6 +47,20 @@ can be installed with:
 pip install -r requirements.txt
 ```
 
+## `ghostnet_gui.py`
+
+For users who prefer a graphical interface there is a small Tkinter based GUI.
+It wraps the command line script and launches the desired mode with the
+arguments you provide.
+
+```bash
+python3 ghostnet_gui.py
+```
+
+Use the radio buttons to select voice or text mode, fill in host and port
+information, and start or stop the underlying process. Output from the running
+command appears in the window.
+
 ### Building a Debian package
 
 The repository includes a `debian` directory for generating a `.deb` package. To
